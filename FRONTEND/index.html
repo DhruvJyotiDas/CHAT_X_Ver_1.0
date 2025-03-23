@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <h2>CHAT - X</h2>
+
+        <!-- User Login -->
+        <div id="user-login">
+            <input type="text" id="username" placeholder="Enter your username">
+            <button onclick="connectToServer()">Connect</button>
+        </div>
+
+        <!-- Chat Area -->
+        <div id="chat-area" style="display: none;">
+            <!-- Online Users -->
+            <div id="user-list"></div>
+
+            <!-- Chat Section -->
+            <div id="chat-box-container">
+                <div id="chat-box"></div>
+                <div id="call-controls">
+                    <button class="call-button voice-call" onclick="startVoiceCall()">📞 Voice Call</button>
+                    <button class="call-button video-call" onclick="startVideoCall()">🎥 Video Call</button>
+                </div>
+                <div id="typing-status"></div>
+                <div id="read-status"></div>
+                <!-- Message Input Box -->
+                <div id="message-container">
+                    <input type="text" id="message" placeholder="Type a message">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Call Box (Appears on Call) -->
+    <div id="video-call-box">
+        <h3>Live Call</h3>
+        <video id="localVideo" autoplay muted></video>
+        <video id="remoteVideo" autoplay></video>
+        
+        <!-- Call Controls -->
+        <div id="call-controls-box">
+            <button id="mute-btn" onclick="toggleMute()">🔇 Mute</button>
+            <button id="end-call-btn" onclick="endCall()">❌ End Call</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

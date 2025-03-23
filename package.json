@@ -1,0 +1,15 @@
+{
+  "name": "dhruv",
+  "version": "1.0.0",
+  "description": "Its my first nodejs project",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "dhruvjyoti",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
