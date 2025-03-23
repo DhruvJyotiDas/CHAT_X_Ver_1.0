@@ -196,20 +196,22 @@ async function initiateCall(videoEnabled) {
     localStream = await navigator.mediaDevices.getUserMedia({ video: videoEnabled, audio: true });
 
     peerConnection = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }] // Public STUN server
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
     });
 
-    // Add local stream tracks to peer connection
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-    // Fix: Ensure remote video is set when tracks arrive
+    // Fix: Ensure the Video Call Box is always shown
+    document.getElementById("video-call-box").style.display = "block";
+
+    document.getElementById("localVideo").srcObject = localStream;
+
     peerConnection.ontrack = (event) => {
         if (!document.getElementById("remoteVideo").srcObject) {
             document.getElementById("remoteVideo").srcObject = event.streams[0];
         }
     };
 
-    // Fix: Ensure ICE candidates are sent to the other peer
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             socket.send(JSON.stringify({
@@ -219,6 +221,17 @@ async function initiateCall(videoEnabled) {
             }));
         }
     };
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    socket.send(JSON.stringify({
+        type: "call-offer",
+        offer,
+        sender: username,
+        recipient: selectedRecipient
+    }));
+}
+
 
     // Create and send offer
     const offer = await peerConnection.createOffer();
