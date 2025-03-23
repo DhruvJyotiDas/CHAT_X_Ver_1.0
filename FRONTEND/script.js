@@ -14,7 +14,7 @@ function connectToServer() {
         return;
     }
 
-    socket = new WebSocket("ws://localhost:3000");
+    socket = new WebSocket("wss://chat-x-ver-1-0.onrender.com");
 
     socket.onopen = () => {
         socket.send(JSON.stringify({ type: "connect", username }));
