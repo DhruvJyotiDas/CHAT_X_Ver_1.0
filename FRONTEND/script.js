@@ -195,29 +195,40 @@ async function startVideoCall() {
 async function initiateCall(videoEnabled) {
     localStream = await navigator.mediaDevices.getUserMedia({ video: videoEnabled, audio: true });
 
-    peerConnection = new RTCPeerConnection(servers);
+    peerConnection = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }] // Public STUN server
+    });
+
+    // Add local stream tracks to peer connection
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-    // Show the Video Call Box when Call Starts
-    document.getElementById("video-call-box").style.display = "block";
-
-    document.getElementById("localVideo").srcObject = localStream;
-
+    // Fix: Ensure remote video is set when tracks arrive
     peerConnection.ontrack = (event) => {
-        document.getElementById("remoteVideo").srcObject = event.streams[0];
-    };
-
-    peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-            socket.send(
-                JSON.stringify({ type: "ice-candidate", candidate: event.candidate, recipient: selectedRecipient })
-            );
+        if (!document.getElementById("remoteVideo").srcObject) {
+            document.getElementById("remoteVideo").srcObject = event.streams[0];
         }
     };
 
+    // Fix: Ensure ICE candidates are sent to the other peer
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            socket.send(JSON.stringify({
+                type: "ice-candidate",
+                candidate: event.candidate,
+                recipient: selectedRecipient
+            }));
+        }
+    };
+
+    // Create and send offer
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
-    socket.send(JSON.stringify({ type: "call-offer", offer, sender: username, recipient: selectedRecipient }));
+    socket.send(JSON.stringify({
+        type: "call-offer",
+        offer,
+        sender: username,
+        recipient: selectedRecipient
+    }));
 }
 
 async function handleIncomingCall(data) {
@@ -227,31 +238,40 @@ async function handleIncomingCall(data) {
 
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
-    peerConnection = new RTCPeerConnection(servers);
+    peerConnection = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    });
+
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-    // Show the Video Call Box when Call Starts
-    document.getElementById("video-call-box").style.display = "block";
-
-    document.getElementById("localVideo").srcObject = localStream;
-
+    // Fix: Ensure remote video is shown when the stream arrives
     peerConnection.ontrack = (event) => {
-        document.getElementById("remoteVideo").srcObject = event.streams[0];
+        if (!document.getElementById("remoteVideo").srcObject) {
+            document.getElementById("remoteVideo").srcObject = event.streams[0];
+        }
     };
 
+    // Fix: Ensure ICE candidates are sent
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            socket.send(
-                JSON.stringify({ type: "ice-candidate", candidate: event.candidate, recipient: data.sender })
-            );
+            socket.send(JSON.stringify({
+                type: "ice-candidate",
+                candidate: event.candidate,
+                recipient: data.sender
+            }));
         }
     };
 
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
-    socket.send(JSON.stringify({ type: "call-answer", answer, recipient: data.sender }));
+    socket.send(JSON.stringify({
+        type: "call-answer",
+        answer,
+        recipient: data.sender
+    }));
 }
+
 
 // End Call Function
 function endCall() {
