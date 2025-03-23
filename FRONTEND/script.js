@@ -257,14 +257,17 @@ async function handleIncomingCall(data) {
 
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-    // Fix: Ensure remote video is shown when the stream arrives
+    // Fix: Ensure the Video Call Box is always shown when answering a call
+    document.getElementById("video-call-box").style.display = "block";
+
+    document.getElementById("localVideo").srcObject = localStream;
+
     peerConnection.ontrack = (event) => {
         if (!document.getElementById("remoteVideo").srcObject) {
             document.getElementById("remoteVideo").srcObject = event.streams[0];
         }
     };
 
-    // Fix: Ensure ICE candidates are sent
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             socket.send(JSON.stringify({
@@ -284,6 +287,7 @@ async function handleIncomingCall(data) {
         recipient: data.sender
     }));
 }
+
 
 
 // End Call Function
