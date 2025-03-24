@@ -21,7 +21,7 @@ wss.on("connection", (ws) => {
         if (message.type === "connect") {
             username = message.username;
             clients[username] = ws;
-            console.log(`${username} connected.`);
+            console.log(${username} connected.);
             broadcastUserList();
         }
 
@@ -85,7 +85,7 @@ wss.on("connection", (ws) => {
     // Handle User Disconnection
     ws.on("close", () => {
         if (username && clients[username]) {
-            console.log(`${username} disconnected.`);
+            console.log(${username} disconnected.);
             delete clients[username];
             broadcastUserList();
         }
@@ -105,7 +105,5 @@ function broadcastUserList() {
 // Start Server
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`WebSocket server running on port ${PORT}`);
+    console.log(WebSocket server running on port ${PORT});
 });
-
-
