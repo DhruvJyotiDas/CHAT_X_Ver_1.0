@@ -1,3 +1,4 @@
+
 let socket;
 let username;
 let selectedRecipient = null;
@@ -39,7 +40,7 @@ function connectToServer() {
         
         else if (data.type === "typing") {
             if (selectedRecipient === data.sender) {
-                document.getElementById("typing-status").innerText = `${data.sender} is typing...`;
+                document.getElementById("typing-status").innerText = ${data.sender} is typing...;
                 clearTimeout(typingTimeout);
                 typingTimeout = setTimeout(() => {
                     document.getElementById("typing-status").innerText = "";
@@ -48,7 +49,7 @@ function connectToServer() {
         } 
         
         else if (data.type === "seen") {
-            document.getElementById("read-status").innerText = `Seen at ${data.timestamp}`;
+            document.getElementById("read-status").innerText = Seen at ${data.timestamp};
         }
 
         // Handle WebRTC Call Signaling
@@ -88,7 +89,7 @@ function selectRecipient(user, element) {
     element.classList.add("selected");
 
     // Show the selected user's name
-    document.getElementById("typing-status").innerText = `Chatting with ${user}`;
+    document.getElementById("typing-status").innerText = Chatting with ${user};
 
     // Clear chat box and load previous messages
     displayMessages(user);
@@ -159,7 +160,7 @@ function displayMessages(user) {
             img.classList.add("profile-pic");
             
             let content = document.createElement("div");
-            content.innerHTML = `<strong>${sender === username ? "You" : sender}:</strong> ${message} <br><small>${timestamp}</small>`;
+            content.innerHTML = <strong>${sender === username ? "You" : sender}:</strong> ${message} <br><small>${timestamp}</small>;
             
             messageElement.appendChild(img);
             messageElement.appendChild(content);
@@ -195,100 +196,63 @@ async function startVideoCall() {
 async function initiateCall(videoEnabled) {
     localStream = await navigator.mediaDevices.getUserMedia({ video: videoEnabled, audio: true });
 
-    peerConnection = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-    });
-
+    peerConnection = new RTCPeerConnection(servers);
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-    // Fix: Ensure the Video Call Box is always shown
+    // Show the Video Call Box when Call Starts
     document.getElementById("video-call-box").style.display = "block";
 
     document.getElementById("localVideo").srcObject = localStream;
 
     peerConnection.ontrack = (event) => {
-        if (!document.getElementById("remoteVideo").srcObject) {
-            document.getElementById("remoteVideo").srcObject = event.streams[0];
-        }
+        document.getElementById("remoteVideo").srcObject = event.streams[0];
     };
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            socket.send(JSON.stringify({
-                type: "ice-candidate",
-                candidate: event.candidate,
-                recipient: selectedRecipient
-            }));
+            socket.send(
+                JSON.stringify({ type: "ice-candidate", candidate: event.candidate, recipient: selectedRecipient })
+            );
         }
     };
 
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
-    socket.send(JSON.stringify({
-        type: "call-offer",
-        offer,
-        sender: username,
-        recipient: selectedRecipient
-    }));
-}
-
-
-    // Create and send offer
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-    socket.send(JSON.stringify({
-        type: "call-offer",
-        offer,
-        sender: username,
-        recipient: selectedRecipient
-    }));
+    socket.send(JSON.stringify({ type: "call-offer", offer, sender: username, recipient: selectedRecipient }));
 }
 
 async function handleIncomingCall(data) {
-    if (!confirm(`${data.sender} is calling you. Accept?`)) {
+    if (!confirm(${data.sender} is calling you. Accept?)) {
         return;
     }
 
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
-    peerConnection = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-    });
-
+    peerConnection = new RTCPeerConnection(servers);
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-    // Fix: Ensure the Video Call Box is always shown when answering a call
+    // Show the Video Call Box when Call Starts
     document.getElementById("video-call-box").style.display = "block";
 
     document.getElementById("localVideo").srcObject = localStream;
 
     peerConnection.ontrack = (event) => {
-        if (!document.getElementById("remoteVideo").srcObject) {
-            document.getElementById("remoteVideo").srcObject = event.streams[0];
-        }
+        document.getElementById("remoteVideo").srcObject = event.streams[0];
     };
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            socket.send(JSON.stringify({
-                type: "ice-candidate",
-                candidate: event.candidate,
-                recipient: data.sender
-            }));
+            socket.send(
+                JSON.stringify({ type: "ice-candidate", candidate: event.candidate, recipient: data.sender })
+            );
         }
     };
 
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
-    socket.send(JSON.stringify({
-        type: "call-answer",
-        answer,
-        recipient: data.sender
-    }));
+    socket.send(JSON.stringify({ type: "call-answer", answer, recipient: data.sender }));
 }
-
-
 
 // End Call Function
 function endCall() {
