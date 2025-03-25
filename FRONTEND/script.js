@@ -1,13 +1,52 @@
-
 let socket;
 let username;
 let selectedRecipient = null;
 let typingTimeout;
-
-// Store chat history for each user, including profile pics
 let chatHistory = {};
 let userProfiles = {};
+let peerConnection;
+let localStream;
+const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
+// DOM Elements
+const messageInput = document.getElementById('message');
+const sendBtn = document.getElementById('send-btn');
+const chatBox = document.getElementById('chat-box');
+const emojiBtn = document.getElementById('emoji-btn');
+const emojiPicker = document.getElementById('emoji-picker');
+const fileBtn = document.getElementById('file-btn');
+const fileInput = document.getElementById('file-input');
+const voiceBtn = document.getElementById('voice-btn');
+const voiceCallBtn = document.querySelector('.voice-call');
+const videoCallBtn = document.querySelector('.video-call');
+const muteBtn = document.getElementById('mute-btn');
+const endCallBtn = document.getElementById('end-call-btn');
+const terminalText = document.querySelector('.terminal-loader .text');
+const chatUsername = document.getElementById('chat-username');
+const userProfilePic = document.getElementById('user-profile-pic');
+const userStatus = document.getElementById('user-status');
+
+// Emoji List
+const emojis = ['😊', '😂', '❤️', '👍', '😍', '😢', '😡', '✨', '🎉', '🔥'];
+let mediaRecorder;
+let audioChunks = [];
+
+// Populate Emoji Picker
+emojis.forEach(emoji => {
+    const span = document.createElement('span');
+    span.classList.add('emoji');
+    span.textContent = emoji;
+    span.addEventListener('click', () => {
+        messageInput.value += emoji;
+        emojiPicker.style.display = 'none';
+    });
+    emojiPicker.appendChild(span);
+});
+
+// Terminal Loader Animation
+terminalText.textContent = "Connecting...";
+
+// Connect to WebSocket Server
 function connectToServer() {
     username = document.getElementById("username").value.trim();
     if (username === "") {
@@ -21,40 +60,39 @@ function connectToServer() {
         socket.send(JSON.stringify({ type: "connect", username }));
         document.getElementById("user-login").style.display = "none";
         document.getElementById("chat-area").style.display = "flex";
+        terminalText.textContent = "Connected!";
     };
 
     socket.onmessage = async (event) => {
         const data = JSON.parse(event.data);
 
         if (data.type === "message") {
-            // Prevent sender from receiving their own message
             if (data.sender !== username) {
                 storeMessage(data.sender, data.recipient, data.message, data.timestamp);
+                terminalText.textContent = "New Message!";
             }
-        } 
-        
-        // Fix: Properly update online users list
-        else if (data.type === "updateUsers") {
+        } else if (data.type === "updateUsers") {
             updateUserList(data.users);
-        } 
-        
-        else if (data.type === "typing") {
+            terminalText.textContent = "Users Updated!";
+            // Update live status (simulated)
+            if (selectedRecipient && data.users.includes(selectedRecipient)) {
+                userStatus.style.background = '#00ff00'; // Online
+            } else if (selectedRecipient) {
+                userStatus.style.background = '#ff0000'; // Offline
+            }
+        } else if (data.type === "typing") {
             if (selectedRecipient === data.sender) {
-                document.getElementById("typing-status").innerText = ${data.sender} is typing...;
+                document.getElementById("typing-status").innerText = `${data.sender} is typing...`;
                 clearTimeout(typingTimeout);
                 typingTimeout = setTimeout(() => {
                     document.getElementById("typing-status").innerText = "";
                 }, 2000);
             }
-        } 
-        
-        else if (data.type === "seen") {
-            document.getElementById("read-status").innerText = Seen at ${data.timestamp};
-        }
-
-        // Handle WebRTC Call Signaling
-        else if (data.type === "call-offer") {
+        } else if (data.type === "seen") {
+            document.getElementById("read-status").innerText = `Seen at ${data.timestamp}`;
+        } else if (data.type === "call-offer") {
             handleIncomingCall(data);
+            terminalText.textContent = "Incoming Call!";
         } else if (data.type === "call-answer") {
             peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
         } else if (data.type === "ice-candidate") {
@@ -63,119 +101,163 @@ function connectToServer() {
     };
 }
 
-// Fix: Ensure online users are displayed properly
+// Update User List
 function updateUserList(users) {
     let userList = document.getElementById("user-list");
-    userList.innerHTML = ""; // Clear previous list
-
+    userList.innerHTML = "";
     users.forEach(user => {
         if (user !== username) {
             let userElement = document.createElement("div");
             userElement.textContent = user;
             userElement.classList.add("user-item");
             userElement.onclick = () => selectRecipient(user, userElement);
-
             userList.appendChild(userElement);
         }
     });
 }
 
-// Fix: Select a user and enable messaging & calls
+// Select Recipient
 function selectRecipient(user, element) {
     selectedRecipient = user;
-
-    // Highlight selected user
     document.querySelectorAll(".user-item").forEach(item => item.classList.remove("selected"));
     element.classList.add("selected");
-
-    // Show the selected user's name
-    document.getElementById("typing-status").innerText = Chatting with ${user};
-
-    // Clear chat box and load previous messages
+    document.getElementById("typing-status").innerText = `Chatting with ${user}`;
+    
+    // Update User Header
+    chatUsername.textContent = user;
+    userProfilePic.src = userProfiles[user] || "default-profile-pic.jpg";
+    userStatus.style.background = '#00ff00'; // Simulated online status
     displayMessages(user);
 }
 
-// Fix: Send messages properly to the selected recipient
-function sendMessage() {
-    if (!selectedRecipient) {
-        alert("Please select a user to chat with.");
-        return;
-    }
-
-    const message = document.getElementById("message").value.trim();
-    if (message === "") {
-        alert("Message cannot be empty.");
-        return;
-    }
-
-    const timestamp = new Date().toLocaleString();
-    const messageData = {
-        type: "message",
-        sender: username,
-        recipient: selectedRecipient,
-        message,
-        timestamp
-    };
-
-    // Display the message immediately in sender's chat window
-    storeMessage(username, selectedRecipient, message, timestamp);
-
-    // Send the message to the server
-    socket.send(JSON.stringify(messageData));
-
-    // Clear the input field
-    document.getElementById("message").value = "";
-}
-
-// Fix: Store and display messages properly
+// Store and Display Messages
 function storeMessage(sender, recipient, message, timestamp) {
     const chatKey = sender === username ? recipient : sender;
-
     if (!chatHistory[chatKey]) {
         chatHistory[chatKey] = [];
     }
-
-    // Fix: Add new messages at the end of the array instead of the top
     chatHistory[chatKey].push({ sender, message, timestamp });
-
     if (selectedRecipient === chatKey) {
         displayMessages(chatKey);
     }
 }
 
-// Fix: Display messages in the correct order (new ones at the bottom)
 function displayMessages(user) {
-    let chatBox = document.getElementById("chat-box");
     chatBox.innerHTML = "";
-
     if (chatHistory[user]) {
-        // Reverse the array to show newest messages first
-        const reversedMessages = [...chatHistory[user]].reverse();
-        reversedMessages.forEach(({ sender, message, timestamp, profilePic }) => {
+        chatHistory[user].forEach(({ sender, message, timestamp }) => {
             let messageElement = document.createElement("div");
             messageElement.classList.add("chat-message", sender === username ? "sender" : "receiver");
-            
             let img = document.createElement("img");
-            img.src = profilePic || userProfiles[sender] || "/Users/rishabhsinghparmar/Downloads/WhatsApp Image 2025-03-14 at 13.12.49.jpeg";
+            img.src = userProfiles[sender] || "default-profile-pic.jpg";
             img.classList.add("profile-pic");
-            
             let content = document.createElement("div");
-            content.innerHTML = <strong>${sender === username ? "You" : sender}:</strong> ${message} <br><small>${timestamp}</small>;
-            
+            content.innerHTML = `<strong>${sender === username ? "You" : sender}:</strong> ${message} <br><small>${timestamp}</small>`;
             messageElement.appendChild(img);
             messageElement.appendChild(content);
             chatBox.appendChild(messageElement);
         });
+        chatBox.scrollTop = chatBox.scrollHeight;
     }
+}
 
-    // Scroll to the top where the newest messages are
-    chatBox.scrollTop = 0;
+// Send Message
+function sendMessage() {
+    if (!selectedRecipient) {
+        alert("Please select a user to chat with.");
+        return;
+    }
+    const message = messageInput.value.trim();
+    if (message === "") {
+        alert("Message cannot be empty.");
+        return;
+    }
+    const timestamp = new Date().toLocaleString();
+    const messageData = { type: "message", sender: username, recipient: selectedRecipient, message, timestamp };
+    storeMessage(username, selectedRecipient, message, timestamp);
+    socket.send(JSON.stringify(messageData));
+    messageInput.value = "";
+    terminalText.textContent = "Message Sent!";
+}
+
+// Typing Indicator
+messageInput.addEventListener('input', () => {
+    if (selectedRecipient) {
+        socket.send(JSON.stringify({ type: "typing", sender: username, recipient: selectedRecipient }));
+    }
+});
+
+// Emoji Picker
+emojiBtn.addEventListener('click', () => {
+    emojiPicker.style.display = emojiPicker.style.display === 'block' ? 'none' : 'block';
+});
+
+document.addEventListener('click', (e) => {
+    if (!emojiBtn.contains(e.target) && !emojiPicker.contains(e.target)) {
+        emojiPicker.style.display = 'none';
+    }
+});
+
+// File Upload
+fileBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file && selectedRecipient) {
+        const fileUrl = URL.createObjectURL(file);
+        const timestamp = new Date().toLocaleString();
+        let message;
+        if (file.type.startsWith('image/')) {
+            message = `<img src="${fileUrl}" alt="Uploaded Image" style="max-width: 200px; border-radius: 10px;"><br><small>${timestamp}</small>`;
+        } else {
+            message = `<a href="${fileUrl}" download="${file.name}">${file.name}</a><br><small>${timestamp}</small>`;
+        }
+        const messageData = { type: "message", sender: username, recipient: selectedRecipient, message, timestamp };
+        storeMessage(username, selectedRecipient, message, timestamp);
+        socket.send(JSON.stringify(messageData));
+        terminalText.textContent = "File Sent!";
+    }
+});
+
+// Voice Recording
+voiceBtn.addEventListener('mousedown', startRecording);
+voiceBtn.addEventListener('mouseup', stopRecording);
+
+function startRecording() {
+    if (!selectedRecipient) return;
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.start();
+            audioChunks = [];
+            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+            voiceBtn.style.background = '#ff4d4d';
+            terminalText.textContent = "Recording...";
+        })
+        .catch(err => console.error('Error accessing microphone:', err));
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const timestamp = new Date().toLocaleString();
+            const message = `<audio controls src="${audioUrl}"></audio><br><small>${timestamp}</small>`;
+            const messageData = { type: "message", sender: username, recipient: selectedRecipient, message, timestamp };
+            storeMessage(username, selectedRecipient, message, timestamp);
+            socket.send(JSON.stringify(messageData));
+            voiceBtn.style.background = '#1c2526';
+            terminalText.textContent = "Voice Note Sent!";
+        };
+    }
 }
 
 // WebRTC Call Functions
-let peerConnection;
-let localStream;
-const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+voiceCallBtn.addEventListener('click', startVoiceCall);
+videoCallBtn.addEventListener('click', startVideoCall);
+muteBtn.addEventListener('click', toggleMute);
+endCallBtn.addEventListener('click', endCall);
 
 async function startVoiceCall() {
     if (!selectedRecipient) {
@@ -183,6 +265,7 @@ async function startVoiceCall() {
         return;
     }
     await initiateCall(false);
+    terminalText.textContent = "Voice Call Started!";
 }
 
 async function startVideoCall() {
@@ -191,17 +274,14 @@ async function startVideoCall() {
         return;
     }
     await initiateCall(true);
+    terminalText.textContent = "Video Call Started!";
 }
 
 async function initiateCall(videoEnabled) {
     localStream = await navigator.mediaDevices.getUserMedia({ video: videoEnabled, audio: true });
-
     peerConnection = new RTCPeerConnection(servers);
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-    // Show the Video Call Box when Call Starts
     document.getElementById("video-call-box").style.display = "block";
-
     document.getElementById("localVideo").srcObject = localStream;
 
     peerConnection.ontrack = (event) => {
@@ -210,9 +290,7 @@ async function initiateCall(videoEnabled) {
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            socket.send(
-                JSON.stringify({ type: "ice-candidate", candidate: event.candidate, recipient: selectedRecipient })
-            );
+            socket.send(JSON.stringify({ type: "ice-candidate", candidate: event.candidate, recipient: selectedRecipient }));
         }
     };
 
@@ -222,18 +300,11 @@ async function initiateCall(videoEnabled) {
 }
 
 async function handleIncomingCall(data) {
-    if (!confirm(${data.sender} is calling you. Accept?)) {
-        return;
-    }
-
+    if (!confirm(`${data.sender} is calling you. Accept?`)) return;
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-
     peerConnection = new RTCPeerConnection(servers);
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-    // Show the Video Call Box when Call Starts
     document.getElementById("video-call-box").style.display = "block";
-
     document.getElementById("localVideo").srcObject = localStream;
 
     peerConnection.ontrack = (event) => {
@@ -242,9 +313,7 @@ async function handleIncomingCall(data) {
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            socket.send(
-                JSON.stringify({ type: "ice-candidate", candidate: event.candidate, recipient: data.sender })
-            );
+            socket.send(JSON.stringify({ type: "ice-candidate", candidate: event.candidate, recipient: data.sender }));
         }
     };
 
@@ -254,10 +323,17 @@ async function handleIncomingCall(data) {
     socket.send(JSON.stringify({ type: "call-answer", answer, recipient: data.sender }));
 }
 
-// End Call Function
-function endCall() {
-    if (peerConnection) {
-        peerConnection.close();
+function toggleMute() {
+    if (localStream) {
+        localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled;
+        muteBtn.textContent = localStream.getAudioTracks()[0].enabled ? "🔇 Mute" : "🔊 Unmute";
+        terminalText.textContent = localStream.getAudioTracks()[0].enabled ? "Unmuted!" : "Muted!";
     }
+}
+
+function endCall() {
+    if (peerConnection) peerConnection.close();
+    if (localStream) localStream.getTracks().forEach(track => track.stop());
     document.getElementById("video-call-box").style.display = "none";
+    terminalText.textContent = "Call Ended!";
 }

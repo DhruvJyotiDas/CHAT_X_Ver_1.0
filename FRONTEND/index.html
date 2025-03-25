@@ -5,15 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket Chat</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="chat-container">
-        <h2>CHAT - X</h2>
+    <div class="chat-container pixelated-container">
+        <h2 class="pixelated-text">CHAT - X</h2>
 
         <!-- User Login -->
         <div id="user-login">
             <input type="text" id="username" placeholder="Enter your username">
-            <button onclick="connectToServer()">Connect</button>
+            <button onclick="connectToServer()" class="pixelated-btn">Connect</button>
         </div>
 
         <!-- Chat Area -->
@@ -23,17 +24,33 @@
 
             <!-- Chat Section -->
             <div id="chat-box-container">
-                <div id="chat-box"></div>
-                <div id="call-controls">
-                    <button class="call-button voice-call" onclick="startVoiceCall()">📞 Voice Call</button>
-                    <button class="call-button video-call" onclick="startVideoCall()">🎥 Video Call</button>
+                <!-- User Header -->
+                <div id="user-header">
+                    <img id="user-profile-pic" src="default-profile-pic.jpg" alt="Profile Pic">
+                    <div class="user-info">
+                        <span id="chat-username" class="pixelated-text"></span>
+                        <span id="user-status" class="status-dot"></span>
+                    </div>
+                    <!-- Call Buttons -->
+                    <div id="call-controls">
+                        <button class="call-button voice-call" onclick="startVoiceCall()">📞</button>
+                        <button class="call-button video-call" onclick="startVideoCall()">🎥</button>
+                    </div>
                 </div>
-                <div id="typing-status"></div>
-                <div id="read-status"></div>
-                <!-- Message Input Box -->
+                <div id="chat-box"></div>
+                <div id="typing-status" class="pixelated-text"></div>
+                <div id="read-status" class="pixelated-text"></div>
+                <!-- Message Input Box with Chat Options -->
                 <div id="message-container">
-                    <input type="text" id="message" placeholder="Type a message">
-                    <button onclick="sendMessage()">Send</button>
+                    <div class="chat-options">
+                        <button id="emoji-btn" class="chat-option-btn">😊</button>
+                        <div id="emoji-picker"></div>
+                        <button id="file-btn" class="chat-option-btn">📎</button>
+                        <input type="file" id="file-input">
+                        <button id="voice-btn" class="chat-option-btn">🎙️</button>
+                    </div>
+                    <textarea id="message" placeholder="Type a message"></textarea>
+                    <button id="send-btn" onclick="sendMessage()" class="pixelated-btn">Send</button>
                 </div>
             </div>
         </div>
@@ -41,15 +58,35 @@
 
     <!-- Video Call Box (Appears on Call) -->
     <div id="video-call-box">
-        <h3>Live Call</h3>
+        <h3 class="pixelated-text">Live Call</h3>
         <video id="localVideo" autoplay muted></video>
         <video id="remoteVideo" autoplay></video>
-        
-        <!-- Call Controls -->
         <div id="call-controls-box">
-            <button id="mute-btn" onclick="toggleMute()">🔇 Mute</button>
-            <button id="end-call-btn" onclick="endCall()">❌ End Call</button>
+            <button id="mute-btn" onclick="toggleMute()" class="pixelated-btn">🔇 Mute</button>
+            <button id="end-call-btn" onclick="endCall()" class="pixelated-btn">❌ End Call</button>
         </div>
+    </div>
+
+    <!-- Terminal Loader for Status Updates -->
+    <div class="terminal-loader">
+        <div class="terminal-header">
+            <div class="terminal-title pixelated-text">Status</div>
+            <div class="terminal-controls">
+                <div class="control close"></div>
+                <div class="control minimize"></div>
+                <div class="control maximize"></div>
+            </div>
+        </div>
+        <div class="text pixelated-text"></div>
+    </div>
+
+    <!-- Floating Animated Icons -->
+    <div class="floating-icons">
+        <span class="floating-icon">💻</span>
+        <span class="floating-icon">📷</span>
+        <span class="floating-icon">🎧</span>
+        <span class="floating-icon">☕</span>
+        <span class="floating-icon">📚</span>
     </div>
 
     <script src="script.js"></script>

@@ -15,13 +15,26 @@ wss.on("connection", (ws) => {
     let username = null;
 
     ws.on("message", (data) => {
-        const message = JSON.parse(data);
+        let message;
+        try {
+            // Handle potential JSON parsing errors
+            message = JSON.parse(data);
+        } catch (error) {
+            console.error("Error parsing message:", error);
+            return;
+        }
 
         // Handle User Connection
         if (message.type === "connect") {
             username = message.username;
+            // Prevent duplicate usernames
+            if (clients[username]) {
+                ws.send(JSON.stringify({ type: "error", message: "Username already taken" }));
+                ws.close();
+                return;
+            }
             clients[username] = ws;
-            console.log(${username} connected.);
+            console.log(`${username} connected.`); // Fixed template literal
             broadcastUserList();
         }
 
@@ -33,6 +46,8 @@ wss.on("connection", (ws) => {
         ) {
             if (clients[message.recipient]) {
                 clients[message.recipient].send(JSON.stringify(message));
+            } else {
+                console.log(`Recipient ${message.recipient} not found for ${message.type}`);
             }
         }
 
@@ -51,12 +66,11 @@ wss.on("connection", (ws) => {
             // Send the message to the recipient if online
             if (recipientSocket) {
                 recipientSocket.send(JSON.stringify(messageData));
+            } else {
+                console.log(`Recipient ${message.recipient} not found for message`);
             }
 
-            // Prevent sender from receiving their own message twice
-            if (clients[message.sender] && message.sender !== message.recipient) {
-                clients[message.sender].send(JSON.stringify(messageData));
-            }
+            // No need to send to sender again since client handles display
         }
 
         // Handle Typing Indicator
@@ -75,17 +89,22 @@ wss.on("connection", (ws) => {
                     JSON.stringify({
                         type: "seen",
                         recipient: message.recipient,
-                        timestamp: new Date().toLocaleTimeString(),
+                        timestamp: new Date().toLocaleString(), // Fixed timestamp format
                     })
                 );
             }
         }
     });
 
+    // Handle WebSocket Errors
+    ws.on("error", (error) => {
+        console.error(`WebSocket error for ${username}:`, error);
+    });
+
     // Handle User Disconnection
     ws.on("close", () => {
         if (username && clients[username]) {
-            console.log(${username} disconnected.);
+            console.log(`${username} disconnected.`); // Fixed template literal
             delete clients[username];
             broadcastUserList();
         }
@@ -98,12 +117,14 @@ function broadcastUserList() {
     const userListMessage = JSON.stringify({ type: "updateUsers", users });
 
     for (let user in clients) {
-        clients[user].send(userListMessage);
+        if (clients[user].readyState === WebSocket.OPEN) {
+            clients[user].send(userListMessage);
+        }
     }
 }
 
 // Start Server
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(WebSocket server running on port ${PORT});
+    console.log(`WebSocket server running on port ${PORT}`); // Fixed template literal
 });
